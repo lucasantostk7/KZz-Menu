@@ -1,0 +1,217 @@
+-- =========================
+-- KZz MENU (FIXED + STRONG AIM)
+-- =========================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LP = Players.LocalPlayer
+
+-- CONFIG
+local SYSTEM_ENABLED = false
+local ESP_ENABLED = false
+local ESP_ALL = false
+local AIMBOT_ENABLED = false
+
+local FOV_VALUE = 60
+local AIM_FORCE_VALUE = 40 
+
+-- COLORS
+local BLUE   = Color3.fromRGB(0, 170, 255)
+local RED    = Color3.fromRGB(60, 20, 20)
+local GREEN  = Color3.fromRGB(20, 60, 20)
+local BG_DARK = Color3.fromRGB(15, 15, 15)
+
+-- =========================
+-- GUI BASE
+-- =========================
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+
+local FOVGui = Instance.new("Frame", gui)
+FOVGui.BackgroundTransparency = 1
+FOVGui.AnchorPoint = Vector2.new(0.5, 0.5)
+FOVGui.Position = UDim2.fromScale(0.5, 0.5)
+FOVGui.Visible = false
+local stroke = Instance.new("UIStroke", FOVGui)
+stroke.Color = BLUE
+stroke.Thickness = 1.5
+Instance.new("UICorner", FOVGui).CornerRadius = UDim.new(1, 0)
+
+-- =========================
+-- SNAPLINES CACHE
+-- =========================
+local SNAP_CACHE = {}
+local function validTarget(p)
+    if ESP_ALL then return true end
+    if not p.Team or not LP.Team then return true end
+    return p.Team ~= LP.Team
+end
+
+-- =========================
+-- MAIN LOOP
+-- =========================
+RunService.RenderStepped:Connect(function()
+    local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    
+    if SYSTEM_ENABLED then
+        FOVGui.Visible = true
+        local size = (FOV_VALUE * 5) -- Escala corrigida para visibilidade
+        FOVGui.Size = UDim2.fromOffset(size, size)
+    else
+        FOVGui.Visible = false
+    end
+
+    local closest = nil
+    local shortest = (FOV_VALUE * 5) / 2
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            -- ESP Highlight
+            local h = p.Character:FindFirstChild("KZz_ESP") or Instance.new("Highlight", p.Character)
+            h.Name = "KZz_ESP"
+            h.Enabled = (SYSTEM_ENABLED and ESP_ENABLED)
+            h.FillColor = ESP_ALL and Color3.fromRGB(255, 170, 0) or (validTarget(p) and Color3.new(1,0,0) or Color3.new(0,1,0))
+
+            -- Snaplines
+            if not SNAP_CACHE[p] then
+                SNAP_CACHE[p] = Instance.new("Frame", gui)
+                SNAP_CACHE[p].BackgroundColor3 = BLUE
+                SNAP_CACHE[p].BorderSizePixel = 0
+                SNAP_CACHE[p].AnchorPoint = Vector2.new(0.5, 0)
+            end
+            local line = SNAP_CACHE[p]
+
+            if SYSTEM_ENABLED and ESP_ENABLED then
+                local pos, vis = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+                if vis then
+                    local startPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                    local endPos = Vector2.new(pos.X, pos.Y)
+                    line.Visible = true
+                    line.Size = UDim2.fromOffset(2, (endPos - startPos).Magnitude)
+                    line.Position = UDim2.fromOffset((startPos.X + endPos.X)/2, (startPos.Y + endPos.Y)/2)
+                    line.Rotation = math.deg(math.atan2(endPos.Y - startPos.Y, endPos.X - startPos.X)) - 90
+                else line.Visible = false end
+            else line.Visible = false end
+
+            -- Aimbot Logic
+            if SYSTEM_ENABLED and AIMBOT_ENABLED and p.Character:FindFirstChild("Head") and validTarget(p) then
+                local pos, vis = Camera:WorldToViewportPoint(p.Character.Head.Position)
+                if vis then
+                    local d = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
+                    if d < shortest then shortest = d closest = p.Character.Head end
+                end
+            end
+        elseif SNAP_CACHE[p] then SNAP_CACHE[p].Visible = false end
+    end
+
+    -- AIMBOT FORTE
+    if closest and SYSTEM_ENABLED and AIMBOT_ENABLED then
+        local targetPos = CFrame.new(Camera.CFrame.Position, closest.Position)
+        local strength = AIM_FORCE_VALUE / 100
+        Camera.CFrame = Camera.CFrame:Lerp(targetPos, strength)
+    end
+end)
+
+-- =========================
+-- MENU UI
+-- =========================
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromScale(0.35, 0.65)
+frame.Position = UDim2.fromScale(0.32, 0.15)
+frame.BackgroundColor3 = BG_DARK
+frame.Active = true
+frame.Draggable = true
+Instance.new("UICorner", frame)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.fromScale(1, 0.12)
+title.BackgroundTransparency = 1
+title.Text = "KZz Menu"
+title.TextColor3 = BLUE
+title.TextSize = 20
+title.Font = Enum.Font.GothamBold
+
+local function createButton(txt, y)
+    local b = Instance.new("TextButton", frame)
+    b.Size = UDim2.fromScale(0.85, 0.08)
+    b.Position = UDim2.fromScale(0.075, y)
+    b.Text = txt .. " OFF"
+    b.BackgroundColor3 = RED
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.Gotham
+    Instance.new("UICorner", b)
+    return b
+end
+
+local b1 = createButton("SYSTEM", 0.15)
+local b2 = createButton("ESP", 0.25)
+local b3 = createButton("ESP ALL", 0.35)
+local b4 = createButton("AIMBOT", 0.45)
+
+-- DISPLAYS DE NÚMEROS
+local fovDisp = Instance.new("TextLabel", frame)
+fovDisp.Size = UDim2.fromScale(0.85, 0.05)
+fovDisp.Position = UDim2.fromScale(0.075, 0.54)
+fovDisp.BackgroundTransparency = 1
+fovDisp.Text = "FOV: " .. FOV_VALUE
+fovDisp.TextColor3 = BLUE
+fovDisp.Font = Enum.Font.Gotham
+
+local aimDisp = Instance.new("TextLabel", frame)
+aimDisp.Size = UDim2.fromScale(0.85, 0.05)
+aimDisp.Position = UDim2.fromScale(0.075, 0.74)
+aimDisp.BackgroundTransparency = 1
+aimDisp.Text = "AIM FORCE: " .. AIM_FORCE_VALUE
+aimDisp.TextColor3 = BLUE
+aimDisp.Font = Enum.Font.Gotham
+
+local function createInput(placeholder, y, callback)
+    local box = Instance.new("TextBox", frame)
+    box.Size = UDim2.fromScale(0.85, 0.08)
+    box.Position = UDim2.fromScale(0.075, y)
+    box.PlaceholderText = placeholder
+    box.Text = ""
+    box.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    box.TextColor3 = Color3.new(1,1,1)
+    box.Font = Enum.Font.Gotham
+    Instance.new("UICorner", box)
+    box.FocusLost:Connect(function()
+        local v = tonumber(box.Text)
+        if v then callback(v) end
+        box.Text = ""
+    end)
+end
+
+createInput("EDIT FOV (1-100)", 0.60, function(v) 
+    FOV_VALUE = math.clamp(v, 1, 300) 
+    fovDisp.Text = "FOV: " .. FOV_VALUE 
+end)
+
+createInput("EDIT AIM (1-100)", 0.80, function(v) 
+    AIM_FORCE_VALUE = math.clamp(v, 1, 100) 
+    aimDisp.Text = "AIM FORCE: " .. AIM_FORCE_VALUE 
+end)
+
+-- LOGIC
+b1.Activated:Connect(function()
+    SYSTEM_ENABLED = not SYSTEM_ENABLED
+    b1.Text = "SYSTEM " .. (SYSTEM_ENABLED and "ON" or "OFF")
+    b1.BackgroundColor3 = SYSTEM_ENABLED and GREEN or RED
+end)
+b2.Activated:Connect(function()
+    ESP_ENABLED = not ESP_ENABLED
+    b2.Text = "ESP " .. (ESP_ENABLED and "ON" or "OFF")
+    b2.BackgroundColor3 = ESP_ENABLED and GREEN or RED
+end)
+b3.Activated:Connect(function()
+    ESP_ALL = not ESP_ALL
+    b3.Text = "ESP ALL " .. (ESP_ALL and "ON" or "OFF")
+    b3.BackgroundColor3 = ESP_ALL and GREEN or RED
+end)
+b4.Activated:Connect(function()
+    AIMBOT_ENABLED = not AIMBOT_ENABLED
+    b4.Text = "AIMBOT " .. (AIMBOT_ENABLED and "ON" or "OFF")
+    b4.BackgroundColor3 = AIMBOT_ENABLED and GREEN or RED
+end)

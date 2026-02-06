@@ -1,2 +1,0 @@
-# KZz-Menu
-Aimbot menu 
